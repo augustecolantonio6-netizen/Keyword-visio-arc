@@ -1,18 +1,19 @@
 {
   "manifest_version": 3,
   "name": "Visio Keyword Alert",
-  "version": "0.4.0",
-  "description": "Sous-titres continus d'une fenêtre de visio, détection de mot-clé, alerte et chat d'assistance.",
+  "version": "0.6.0",
+  "description": "Sous-titres Live d'une fenêtre de visioconférence, détection de mot-clé, alerte et chat d'assistance.",
   "permissions": [
     "storage",
     "notifications",
-    "windows",
-    "desktopCapture",
-    "offscreen"
+    "windows"
   ],
   "host_permissions": [
     "https://generativelanguage.googleapis.com/*"
   ],
+  "content_security_policy": {
+    "extension_pages": "script-src 'self'; object-src 'self'; connect-src 'self' https://generativelanguage.googleapis.com wss://generativelanguage.googleapis.com"
+  },
   "action": {
     "default_popup": "popup.html",
     "default_title": "Visio Keyword Alert"
