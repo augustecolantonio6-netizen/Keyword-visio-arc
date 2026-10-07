@@ -1,12 +1,14 @@
 {
   "manifest_version": 3,
   "name": "Visio Keyword Alert",
-  "version": "0.2.0",
-  "description": "Surveille une fenêtre de visioconférence, transcrit l'audio, détecte un mot-clé, alerte et ouvre un chat Gemini avec la dernière question et une capture.",
+  "version": "0.4.0",
+  "description": "Sous-titres continus d'une fenêtre de visio, détection de mot-clé, alerte et chat d'assistance.",
   "permissions": [
     "storage",
     "notifications",
-    "windows"
+    "windows",
+    "desktopCapture",
+    "offscreen"
   ],
   "host_permissions": [
     "https://generativelanguage.googleapis.com/*"
