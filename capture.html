@@ -7,27 +7,32 @@
 </head>
 <body>
 <main>
-  <div class="head">
+  <header>
     <div>
-      <h1>Surveillance de la visio</h1>
-      <p id="state">Choisis la fenêtre de ta visio.</p>
+      <h1>Surveillance visio</h1>
+      <p id="state">Clique sur « Choisir la fenêtre ».</p>
     </div>
     <span id="badge">OFF</span>
-  </div>
+  </header>
 
-  <div class="buttons">
+  <div class="row">
     <button id="start" class="primary">Choisir la fenêtre</button>
     <button id="stop" disabled>Arrêter</button>
-    <button id="chat">Chat</button>
+    <button id="minimize" disabled>Réduire</button>
   </div>
 
-  <video id="preview" muted autoplay playsinline></video>
+  <video id="preview" autoplay muted playsinline></video>
 
-  <div class="title">Sous-titres récents</div>
-  <div id="transcript"></div>
+  <section>
+    <div class="label">Sous-titres</div>
+    <div id="finalTranscript"></div>
+    <div id="interimTranscript"></div>
+  </section>
 
-  <div class="title">Enregistrement écran</div>
-  <div id="recordStatus">Désactivé</div>
+  <section>
+    <div class="label">Statut</div>
+    <div id="status"></div>
+  </section>
 </main>
 <script src="capture.js"></script>
 </body>
