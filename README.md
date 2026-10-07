@@ -1,74 +1,42 @@
-# Visio Keyword Alert 0.2.0
+# Visio Keyword Alert
 
-Extension Manifest V3 pour Arc Windows.
+## Fonctionnement
 
-## Cahier des charges couvert
+L'extension ouvre un petit contrôleur dédié depuis l'icône de la toolbar. Tu choisis explicitement la fenêtre de visioconférence via le sélecteur système. Une fois le partage démarré, le contrôleur peut être réduit et la fenêtre sélectionnée reste la source surveillée pendant que tu changes d'application.
 
-- Icône dans la toolbar d'Arc.
-- Fenêtre de settings.
-- Choix du mot/prénom à repérer.
-- Choix de la matière :
-  Littérature anglaise BFI, Spécialité mathématiques, Histoire,
-  Géographie, Philosophie, Maths expertes, Physique chimie, EMC.
-- Clé API Gemini réglée une fois.
-- Modèle Gemini réglable avec `gemini-3.5-flash-lite` par défaut.
-- Prompt automatique modifiable.
-- Variables de prompt `{{subject}}` et `{{question}}`.
-- Lancement depuis la toolbar.
-- Sélection de la fenêtre de visio.
-- Surveillance de la fenêtre sélectionnée pendant qu'une autre fenêtre est active.
-- Sous-titres quasi temps réel.
-- Détection du mot/prénom dans la transcription.
-- Gros popup rouge + notification Windows.
-- Récupération de la dernière question détectée.
-- Capture de la fenêtre de visio au moment du déclenchement.
-- Envoi de la question et de la capture au modèle Gemini configuré.
-- Ouverture d'un chat séparé avec le contexte déjà affiché.
-- Possibilité d'envoyer d'autres questions au même chat.
-- Saisie vocale dans le chat.
-- Option d'enregistrer la fenêtre de visio en WebM.
+L'audio de la fenêtre est converti en PCM mono 16 kHz et envoyé à Gemini Live Transcription par WebSocket. La connexion attend `setupComplete` avant le premier paquet audio. Les transcriptions provisoires et définitives sont toutes deux utilisées.
 
-## Installation
+## Détection
 
-1. Décompresser le ZIP.
-2. Dans Arc, ouvrir `arc://extensions`.
-3. Activer le mode développeur.
-4. Cliquer sur « Charger l'extension non empaquetée ».
-5. Sélectionner le dossier `visio-keyword-alert-v0.2`.
-6. Épingler l'extension dans la toolbar.
-7. Ouvrir les réglages.
-8. Entrer le mot/prénom, la matière, la clé API et le prompt.
-9. Cliquer sur « Lancer l'extension sur la visio ».
-10. Dans le sélecteur Windows, sélectionner la fenêtre de visio et autoriser l'audio système.
+Le mot/prénom est ajouté au vocabulaire personnalisé de la transcription. La détection fonctionne sur les hypothèses provisoires à faible latence ainsi que sur les segments finaux. Un cooldown évite les alertes répétées.
 
-## Prompt par défaut
+Après détection, l'extension :
+- affiche une notification Windows ;
+- ouvre un popup d'alerte très visible ;
+- capture une image de la fenêtre surveillée ;
+- transmet le contexte récent au chat.
 
-Je suis en terminale en cours de {{subject}} en visio.
-Je n'ai pas écouté correctement le passage et le professeur vient de me poser cette question :
-{{question}}
+Le chat reste séparé de la visioconférence et les demandes supplémentaires sont déclenchées manuellement.
 
-Réponds de façon humaine et brève pour m'aider à comprendre quoi répondre.
-Pas de tirets. Pas de virgules. Pas de smiley.
-Fais un petit texte compact.
+## Configuration
 
-## Important pour l'overlay
-
-Une extension Chromium ne peut pas garantir un élément HTML constamment « always on top » au-dessus de TOUTES les applications Windows. Cette version combine donc une notification Windows avec une fenêtre popup très visible qui reprend le focus.
-
-Pour un vrai overlay natif permanent au-dessus de toutes les applications, il faudrait compléter l'extension avec un petit composant Windows natif.
-
-## Important pour la capture
-
-`getDisplayMedia()` demande une autorisation utilisateur et permet de choisir une fenêtre ou un écran. La capture continue même si l'utilisateur change de fenêtre au premier plan.
+Mot/prénom, matière, clé API Gemini, modèle de réponse, langue audio et prompt de contexte sont configurables. Le modèle de réponse par défaut est `gemini-3.5-flash-lite`. La transcription utilise `gemini-3.5-transcribe-live`.
 
 ## Enregistrement
 
-Quand l'option est activée, le flux capturé est enregistré en WebM. À l'arrêt, l'extension affiche un lien local permettant de sauvegarder l'enregistrement.
+Une option permet d'enregistrer le flux capturé en WebM. Le fichier est généré lorsque la surveillance est arrêtée.
 
-## API
+## Installation
 
-La clé API est stockée dans `chrome.storage.local`. Pour un projet distribué, mieux vaut passer par un serveur intermédiaire. Pour une utilisation locale, cette architecture évite d'avoir un serveur obligatoire.
+1. Ouvre `arc://extensions`.
+2. Active le mode développeur.
+3. Charge le dossier de l'extension.
+4. Épingle l'icône.
+5. Configure la clé API et le mot/prénom.
+6. Clique sur l'icône puis sur « Choisir la fenêtre ».
+7. Sélectionne la fenêtre de visio et partage son audio.
+8. Le contrôleur peut être réduit pendant l'utilisation.
 
-## Note
+## Limites
 
-Le prototype dépend du support par Arc/Chromium de la capture d'affichage et de la disponibilité des codecs audio/vidéo. L'autorisation « partager l'audio » est indispensable aux sous-titres.
+Le partage audio dépend des options proposées par Windows/Arc dans le sélecteur. Une extension Chromium ne peut pas garantir un vrai « always on top » natif au-dessus de chaque application Windows.
