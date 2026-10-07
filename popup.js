@@ -1,9 +1,9 @@
-const DEFAULT_PROMPT=\`Je suis en terminale en cours de {{subject}} en visio.
+const DEFAULT_PROMPT=`Je suis en terminale en cours de {{subject}} en visio.
 Voici la dernière question détectée :
 {{question}}
 
 Explique brièvement la question et les notions utiles.
-Réponse compacte. Pas de smiley.\`;
+Réponse compacte. Pas de smiley.`;
 
 const $=id=>document.getElementById(id);
 
@@ -18,9 +18,12 @@ async function load(){
     recordScreen:false
   });
 
-  for(const id of ["keyword","subject","apiKey","model","language","promptTemplate"]){
-    $(id).value=s[id];
-  }
+  $("keyword").value=s.keyword;
+  $("subject").value=s.subject;
+  $("apiKey").value=s.apiKey;
+  $("model").value=s.model;
+  $("language").value=s.language;
+  $("promptTemplate").value=s.promptTemplate;
   $("recordScreen").checked=!!s.recordScreen;
 
   const state=await chrome.storage.local.get({captureRunning:false,captureStatus:""});
@@ -57,6 +60,7 @@ $("start").onclick=async()=>{
     $("status").textContent="Renseigne le mot/prénom et la clé API.";
     return;
   }
+
   $("status").textContent="Ouverture du contrôleur…";
   chrome.runtime.sendMessage({type:"OPEN_CAPTURE_CONTROLLER"});
   window.close();
@@ -64,6 +68,7 @@ $("start").onclick=async()=>{
 
 $("stop").onclick=()=>{
   chrome.runtime.sendMessage({type:"STOP_CAPTURE"});
+  $("status").textContent="Arrêt demandé.";
 };
 
 chrome.runtime.onMessage.addListener(msg=>{
