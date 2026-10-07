@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<title>Visio Keyword Alert</title>
+<link rel="stylesheet" href="popup.css">
+</head>
+<body>
+<main>
+  <h1>Visio Keyword Alert</h1>
+
+  <label>Mot / prénom à repérer
+    <input id="keyword" placeholder="Ex. Thomas">
+  </label>
+
+  <label>Matière
+    <select id="subject">
+      <option>Littérature anglaise BFI</option>
+      <option>Spécialité mathématiques</option>
+      <option>Histoire</option>
+      <option>Géographie</option>
+      <option>Philosophie</option>
+      <option>Maths expertes</option>
+      <option>Physique chimie</option>
+      <option>EMC</option>
+    </select>
+  </label>
+
+  <label>Clé API Gemini
+    <input id="apiKey" type="password" placeholder="AIza...">
+  </label>
+
+  <label>Modèle Gemini
+    <input id="model" value="gemini-3.5-flash-lite">
+  </label>
+
+  <label>Prompt automatique
+    <textarea id="promptTemplate" rows="10"></textarea>
+  </label>
+
+  <label class="check">
+    <input id="recordScreen" type="checkbox">
+    Enregistrer la fenêtre de visio en WebM
+  </label>
+
+  <div class="row">
+    <button id="save">Enregistrer</button>
+    <button id="chat">Ouvrir le chat</button>
+  </div>
+  <button id="start" class="primary">Lancer l'extension sur la visio</button>
+
+  <p id="status"></p>
+  <p class="small">
+    Tu sélectionnes une seule fois la fenêtre de visio. L'extension continue de surveiller cette fenêtre
+    même lorsque tu passes sur une autre fenêtre.
+  </p>
+</main>
+<script src="popup.js"></script>
+</body>
+</html>

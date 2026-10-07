@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<title>Chat Gemini visio</title>
+<link rel="stylesheet" href="chat.css">
+</head>
+<body>
+<header>
+  <div>
+    <strong>Chat visio</strong>
+    <span id="meta"></span>
+  </div>
+  <button id="clear">Effacer</button>
+</header>
+
+<div id="promptPreview"></div>
+<main id="messages"></main>
+
+<form id="form">
+  <textarea id="input" rows="3" placeholder="Pose une autre question…"></textarea>
+  <div class="row">
+    <button type="button" id="voice">🎙 Voix</button>
+    <button class="primary">Envoyer</button>
+  </div>
+</form>
+
+<script src="chat.js"></script>
+</body>
+</html>
