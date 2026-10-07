@@ -4,6 +4,7 @@ let question = "";
 let screenshot = null;
 let keyword = "";
 let history = [];
+let lastEventTs = 0;
 
 const DEFAULT_PROMPT = `Je suis en terminale en cours de {{subject}} en visio.
 Je n'ai pas écouté correctement le passage et le professeur vient de me poser cette question :
@@ -69,6 +70,8 @@ async function callGemini(s,instruction,contents) {
 
 async function newEvent(p) {
   if (!p) return;
+  if (p.ts && p.ts <= lastEventTs) return;
+  if (p.ts) lastEventTs = p.ts;
   if (p.subject) subject = p.subject;
   if (p.keyword) keyword = p.keyword;
   if (p.question) question = p.question;
@@ -131,12 +134,31 @@ async function init() {
   promptTemplate = s.promptTemplate || DEFAULT_PROMPT;
   renderPrompt();
 
-  const {pendingChatEvent} = await chrome.storage.local.get({pendingChatEvent:null});
-  if (pendingChatEvent) await newEvent(pendingChatEvent);
+  const stored = await chrome.storage.local.get({
+    pendingChatEvent:null,
+    chatBootstrap:null,
+    lastEvent:null
+  });
+
+  const candidates=[stored.pendingChatEvent,stored.chatBootstrap,stored.lastEvent]
+    .filter(Boolean)
+    .sort((a,b)=>(b.ts||0)-(a.ts||0));
+
+  if(candidates[0]){
+    await newEvent(candidates[0]);
+    await chrome.storage.local.remove(["pendingChatEvent","chatBootstrap"]);
+  }
 }
 
 chrome.runtime.onMessage.addListener(msg => {
   if (msg?.type === "CHAT_EVENT") newEvent(msg.payload || {});
+
+  if (msg?.type === "LIVE_TRANSCRIPT") {
+    const finalEl=document.getElementById("liveFinal");
+    const interimEl=document.getElementById("liveInterim");
+    if(finalEl) finalEl.textContent=msg.transcript||"";
+    if(interimEl) interimEl.textContent=msg.interim||"";
+  }
 });
 
 $("form").onsubmit = e => {
