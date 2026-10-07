@@ -126,48 +126,92 @@ let awaitSettingsCache={keyword:"",subject:"",apiKey:"",model:"",language:"",pro
 function scheduleSessionRefresh(){
   clearTimeout(sessionRefreshTimer);
   sessionRefreshTimer=setTimeout(()=>{
-    if(running) reconnectLive();
+    if(running) reconnectLive(true);
   },SESSION_MS);
+}
+
+function getResumeConfig(){
+  return sessionHandle
+    ? {sessionResumption:{handle:sessionHandle}}
+    : {sessionResumption:{}};
 }
 
 function connectLive(){
   clearTimeout(liveReconnectTimer);
   if(!running) return;
 
+  const generation=++reconnectGeneration;
   wsReady=false;
+
+  try{
+    ws?.close();
+  }catch{}
+  ws=null;
+
   ws=new WebSocket(
     `wss://generativelanguage.googleapis.com/ws/google.ai.generativelanguage.v1beta.GenerativeService.BidiGenerateContent?key=${encodeURIComponent(awaitSettingsCache.apiKey)}`
   );
 
   ws.onopen=()=>{
+    if(!running || generation!==reconnectGeneration) return;
+
     const languageCodes=awaitSettingsCache.language
       ? [awaitSettingsCache.language]
       : [];
 
-    ws.send(JSON.stringify({
+    const setup={
       setup:{
         model:"models/gemini-3.5-transcribe-live",
         generationConfig:{responseModalities:["TEXT"]},
+        contextWindowCompression:{slidingWindow:{}},
+        ...getResumeConfig(),
         inputAudioTranscription:{
           languageCodes,
           mode:"VERBATIM",
           customVocabulary:[awaitSettingsCache.keyword].filter(Boolean)
         }
       }
-    }));
+    };
 
-    scheduleSessionRefresh();
-    sendStatus("Connexion Live ouverte… attente de setupComplete.");
+    ws.send(JSON.stringify(setup));
+    sendStatus(sessionHandle
+      ? "Reconnexion Live avec reprise de session…"
+      : "Connexion Live ouverte… attente de setupComplete."
+    );
   };
 
   ws.onmessage=event=>{
+    if(!running || generation!==reconnectGeneration) return;
+
     let data;
     try{data=JSON.parse(event.data)}catch{return}
 
     if(data.setupComplete){
       wsReady=true;
+      scheduleSessionRefresh();
       sendStatus("Sous-titres Live actifs.");
       return;
+    }
+
+    // Google may send a new resumable handle periodically.
+    if(data.sessionResumptionUpdate){
+      const u=data.sessionResumptionUpdate;
+      if(u.resumable && u.newHandle){
+        sessionHandle=u.newHandle;
+        chrome.storage.local.set({liveSessionHandle:sessionHandle}).catch(()=>{});
+      }
+    }
+
+    // Reconnect before the server closes the socket.
+    if(data.goAway){
+      const timeLeftMs=Number(data.goAway.timeLeft?.seconds||0)*1000 +
+        Number(data.goAway.timeLeft?.nanos||0)/1e6;
+      if(timeLeftMs>0){
+        clearTimeout(sessionRefreshTimer);
+        sessionRefreshTimer=setTimeout(()=>{
+          if(running) reconnectLive(true);
+        },Math.max(500,timeLeftMs-1000));
+      }
     }
 
     const c=data.serverContent;
@@ -187,8 +231,12 @@ function connectLive(){
       const final=c.inputTranscription.text||"";
       if(final){
         transcriptFinal.push(final);
-        if(transcriptFinal.length>30) transcriptFinal.shift();
-        currentSpeechForTrigger=(currentSpeechForTrigger+" "+final).trim().slice(-1000);
+        if(transcriptFinal.length>40) transcriptFinal.shift();
+
+        currentSpeechForTrigger=(currentSpeechForTrigger+" "+final)
+          .trim()
+          .slice(-1500);
+
         interimText="";
         showTranscript();
 
@@ -202,23 +250,33 @@ function connectLive(){
 
   ws.onerror=()=>{
     wsReady=false;
-    sendStatus("Erreur de connexion Live. Reconnexion…");
+    if(running && generation===reconnectGeneration){
+      sendStatus("Erreur Live. Tentative de reconnexion…");
+    }
   };
 
   ws.onclose=()=>{
     wsReady=false;
-    if(running){
+    if(running && generation===reconnectGeneration){
       clearTimeout(liveReconnectTimer);
-      liveReconnectTimer=setTimeout(connectLive,1200);
+      liveReconnectTimer=setTimeout(()=>connectLive(),1200);
       sendStatus("Session Live fermée. Reconnexion…");
     }
   };
 }
 
-function reconnectLive(){
+function reconnectLive(force=false){
+  if(!running) return;
+
   if(ws){
-    try{ws.close()}catch{}
+    try{
+      if(force && ws.readyState===WebSocket.OPEN){
+        ws.send(JSON.stringify({realtimeInput:{audioStreamEnd:true}}));
+      }
+      ws.close();
+    }catch{}
   }
+
   ws=null;
   wsReady=false;
   connectLive();
@@ -330,6 +388,9 @@ async function startCapture(){
   const s=await settings();
   awaitSettingsCache=s;
 
+  const stored=await chrome.storage.local.get({liveSessionHandle:null});
+  sessionHandle=stored.liveSessionHandle||null;
+
   if(!s.keyword){
     sendStatus("Configure d'abord un mot/prénom.",false);
     return;
@@ -423,6 +484,8 @@ function stopCapture(reason="Surveillance arrêtée."){
   }
   ws=null;
   wsReady=false;
+  sessionHandle=null;
+  chrome.storage.local.remove("liveSessionHandle").catch(()=>{});
 
   if(processorNode) processorNode.onaudioprocess=null;
   try{sourceNode?.disconnect()}catch{}
