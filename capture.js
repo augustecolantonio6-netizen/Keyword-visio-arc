@@ -646,6 +646,11 @@ $("minimize").onclick=async()=>{
 
 chrome.runtime.onMessage.addListener(msg=>{
   if(msg?.type==="CAPTURE_STOP") stopCapture();
+  if(msg?.type==="ALERT_OPEN_FAILED"){
+    const message="Impossible d’ouvrir la fenêtre d’alerte + chat : "+(msg.error||"erreur inconnue");
+    $("state").textContent=message;
+    sendStatus(message,running);
+  }
 });
 
 $("transcriptFullscreen").onclick=async()=>{
