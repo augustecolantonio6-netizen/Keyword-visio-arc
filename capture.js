@@ -80,6 +80,31 @@ function showAlert(payload){
   $("alertKeyword").textContent=payload?.keyword||"Mot détecté";
   $("alertQuestion").textContent=payload?.question||"Le mot-clé a été détecté dans la transcription.";
   banner.hidden=false;
+  banner.scrollIntoView({behavior:"smooth",block:"center"});
+  focusDashboardWindow().catch(error=>{
+    sendStatus("Alerte affichée, mais remise au premier plan impossible : "+error.message);
+  });
+}
+
+async function focusDashboardWindow(){
+  const current=await chrome.windows.getCurrent();
+  if(!Number.isInteger(current.id)) throw new Error("ID de fenêtre indisponible.");
+
+  // Restore first, then activate. Call window.focus as a second, renderer-side attempt.
+  await chrome.windows.update(current.id,{state:"normal"});
+  await chrome.windows.update(current.id,{focused:true,drawAttention:true});
+  try{window.focus()}catch{}
+
+  // Some Chromium shells apply a delayed state transition after restoring a popup.
+  setTimeout(async()=>{
+    try{
+      await chrome.windows.update(current.id,{state:"normal",focused:true,drawAttention:true});
+      window.focus();
+    }catch(error){
+      const status=$("status");
+      if(status) status.textContent="Alerte détectée. Arc n’a pas autorisé le focus automatique : "+(error?.message||error);
+    }
+  },350);
 }
 
 function b64FromInt16(int16){
@@ -647,6 +672,13 @@ $("minimize").onclick=async()=>{
 chrome.runtime.onMessage.addListener(msg=>{
   if(msg?.type==="CAPTURE_STOP") stopCapture();
   if(msg?.type==="VISIO_ALERT") showAlert(msg.payload||{});
+  if(msg?.type==="DASHBOARD_FOCUS_FAILED"){
+    const status=$("status");
+    if(status) status.textContent="Alerte détectée, mais Arc/Windows a bloqué le premier plan : "+(msg.message||"");
+  }
+  if(msg?.type==="RAISE_DASHBOARD"){
+    focusDashboardWindow().catch(()=>{});
+  }
 });
 
 $("dismissAlert").onclick=()=>{$("alertBanner").hidden=true;};
