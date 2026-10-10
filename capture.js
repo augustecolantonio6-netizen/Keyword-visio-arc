@@ -80,7 +80,7 @@ function showAlert(payload){
   $("alertKeyword").textContent=payload?.keyword||"Mot détecté";
   $("alertQuestion").textContent=payload?.question||"Le mot-clé a été détecté dans la transcription.";
   banner.hidden=false;
-  banner.scrollIntoView({behavior:"smooth",block:"center"});
+  banner.scrollIntoView({behavior:"smooth",block:"start"});
   focusDashboardWindow().catch(error=>{
     sendStatus("Alerte affichée, mais remise au premier plan impossible : "+error.message);
   });
