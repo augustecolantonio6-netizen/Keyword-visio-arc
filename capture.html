@@ -2,20 +2,21 @@
 <html lang="fr">
 <head>
 <meta charset="utf-8">
-<title>Surveillance visio</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Visio Keyword Alert</title>
 <link rel="stylesheet" href="capture.css">
 </head>
 <body>
 <main>
-  <header>
-    <div>
+  <header class="topbar">
+    <div class="heading">
       <h1>Surveillance visio</h1>
       <p id="state">Clique sur « Choisir la fenêtre ».</p>
     </div>
     <span id="badge">OFF</span>
   </header>
 
-  <div class="row">
+  <div class="toolbar">
     <button id="start" class="primary">Choisir la fenêtre</button>
     <button id="stop" disabled>Arrêter</button>
     <button id="minimize" disabled>Réduire</button>
@@ -23,20 +24,26 @@
 
   <video id="preview" autoplay muted playsinline></video>
 
-  <section>
-    <div class="label">Niveau audio capturé</div>
-    <div id="audioLevel">—</div>
-  </section>
-
-  <section>
-    <div class="label">Sous-titres</div>
-    <div id="finalTranscript"></div>
+  <section id="transcriptPanel" class="panel">
+    <div class="section-head">
+      <div class="label">Sous-titres en direct</div>
+      <div class="audio-meter">Audio <strong id="audioLevel">—</strong></div>
+    </div>
+    <div id="finalTranscript" aria-live="polite"></div>
     <div id="interimTranscript"></div>
+    <div id="status"></div>
   </section>
 
-  <section>
-    <div class="label">Statut</div>
-    <div id="status"></div>
+  <section id="alertBanner" class="alert-banner" hidden role="alert">
+    <div class="alert-kicker">MOT / PRÉNOM DÉTECTÉ</div>
+    <div id="alertKeyword"></div>
+    <div id="alertQuestion"></div>
+    <button id="dismissAlert" type="button">Masquer l’alerte</button>
+  </section>
+
+  <section id="chatPanel" class="panel chat-panel">
+    <div class="label">Chat Gemini — aide à la compréhension</div>
+    <iframe id="chatFrame" src="chat.html" title="Chat Gemini" allow="clipboard-read; clipboard-write"></iframe>
   </section>
 </main>
 <script src="capture.js"></script>
