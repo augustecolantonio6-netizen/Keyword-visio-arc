@@ -6,9 +6,9 @@ let keyword = "";
 let history = [];
 let lastEventTs = 0;
 
-const DEFAULT_PROMPT="Je suis en terminale en cours de {{subject}}.\nVoici la dernière question ou le passage transcrit :\n{{question}}\n\nAide-moi à comprendre ce qui est demandé. Explique brièvement les notions essentielles, puis propose une formulation orale courte que je pourrai reformuler avec mes propres mots. Reste naturel, clair et adapté au niveau terminale. Si la transcription est ambiguë, précise-le. Pas de smileys.";
+const DEFAULT_PROMPT="Je suis en terminale en cours de {{subject}}.\nVoici la dernière question ou le passage transcrit :\n{{question}}\n\nAide-moi à comprendre ce qui est demandé. Explique brièvement les notions essentielles et la démarche de réflexion, sans rédiger une réponse à réciter. Si la transcription est ambiguë, précise-le. Réponse concise. Pas de smileys.";
 
-const LEGACY_PROMPTS=["Je suis en terminale en cours de {{subject}} en visio.\nVoici la dernière question détectée :\n{{question}}\n\nExplique brièvement la question et les notions utiles.\nRéponse compacte. Pas de smiley.","Je suis en terminale en cours de {{subject}} en visio.\nJe n'ai pas écouté correctement le passage et le professeur vient de me poser cette question :\n{{question}}\n\nRéponds de façon humaine et brève pour m'aider à comprendre quoi répondre.\nPas de tirets. Pas de virgules. Pas de smiley.\nFais un petit texte compact."];
+const LEGACY_PROMPTS=["Je suis en terminale en cours de {{subject}} en visio.\nVoici la dernière question détectée :\n{{question}}\n\nExplique brièvement la question et les notions utiles.\nRéponse compacte. Pas de smiley.","Je suis en terminale en cours de {{subject}} en visio.\nJe n'ai pas écouté correctement le passage et le professeur vient de me poser cette question :\n{{question}}\n\nRéponds de façon humaine et brève pour m'aider à comprendre quoi répondre.\nPas de tirets. Pas de virgules. Pas de smiley.\nFais un petit texte compact.","Je suis en terminale en cours de {{subject}}.\nVoici la dernière question ou le passage transcrit :\n{{question}}\n\nAide-moi à comprendre ce qui est demandé. Explique brièvement les notions essentielles, puis propose une formulation orale courte que je pourrai reformuler avec mes propres mots. Reste naturel, clair et adapté au niveau terminale. Si la transcription est ambiguë, précise-le. Pas de smileys."];
 
 const $ = id => document.getElementById(id);
 
@@ -71,7 +71,7 @@ async function callGemini(s,instruction,contents) {
   return data?.candidates?.[0]?.content?.parts?.map(p=>p.text||"").join("").trim() || "";
 }
 
-async function newEvent(p) {
+async function newEvent(p, autoAnalyze=false) {
   if (!p) return;
   if (p.ts && p.ts <= lastEventTs) return;
   if (p.ts) lastEventTs = p.ts;
@@ -89,6 +89,8 @@ async function newEvent(p) {
     add("ai",p.answer);
     history.push({role:"model",parts:[{text:p.answer}]});
   }
+
+  if(autoAnalyze) await autoAnalyzeEvent(p);
 }
 
 async function send(text) {
@@ -131,6 +133,15 @@ async function send(text) {
   }
 }
 
+async function autoAnalyzeEvent(p) {
+  const eventTs=p?.ts||Date.now();
+  const stored=await chrome.storage.local.get({autoAnalyzedEventTs:0});
+  if(eventTs<=stored.autoAnalyzedEventTs) return;
+
+  await chrome.storage.local.set({autoAnalyzedEventTs:eventTs});
+  await send("Explique la question détectée, les notions utiles et une démarche de réflexion pour que je puisse la résoudre moi-même. Ne rédige pas une réponse à réciter. Signale toute ambiguïté de transcription.");
+}
+
 async function init() {
   const s = await settings();
   subject = s.subject;
@@ -148,20 +159,16 @@ async function init() {
     .sort((a,b)=>(b.ts||0)-(a.ts||0));
 
   if(candidates[0]){
-    await newEvent(candidates[0]);
+    const eventTs=candidates[0].ts||0;
+    const recent=eventTs>0 && Date.now()-eventTs<45000;
+    await newEvent(candidates[0],recent);
     await chrome.storage.local.remove(["pendingChatEvent","chatBootstrap"]);
   }
 }
 
 chrome.runtime.onMessage.addListener(msg => {
-  if (msg?.type === "CHAT_EVENT") newEvent(msg.payload || {});
-
-  if (msg?.type === "LIVE_TRANSCRIPT") {
-    const finalEl=document.getElementById("liveFinal");
-    const interimEl=document.getElementById("liveInterim");
-    if(finalEl) finalEl.textContent=msg.transcript||"";
-    if(interimEl) interimEl.textContent=msg.interim||"";
-  }
+  if (msg?.type === "CHAT_EVENT") newEvent(msg.payload || {},true);
+  if (msg?.type === "FOCUS_CHAT") $("input").focus();
 });
 
 $("form").onsubmit = e => {
