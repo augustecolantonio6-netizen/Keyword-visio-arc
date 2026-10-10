@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Alerte + chat Gemini</title>
+<link rel="stylesheet" href="alertchat.css">
+<link rel="stylesheet" href="chat.css">
+</head>
+<body>
+<main class="alert-chat-shell">
+  <section id="alertBanner" role="alert">
+    <header class="alert-head">
+      <span class="alert-kicker">MOT / PRÉNOM DÉTECTÉ</span>
+      <button id="closeAlertWindow" type="button" aria-label="Fermer la fenêtre">✕</button>
+    </header>
+    <div id="alertKeyword">Mot détecté</div>
+    <div id="alertQuestion">Lecture du contexte détecté…</div>
+  </section>
+
+  <section id="chatPanel">
+    <header class="chat-head">
+      <div>
+        <strong>Chat Gemini</strong>
+        <span id="meta"></span>
+      </div>
+      <button id="clear" type="button">Effacer</button>
+    </header>
+
+    <details id="promptDetails">
+      <summary>Consignes du chat</summary>
+      <div id="promptPreview"></div>
+    </details>
+
+    <div id="messages" role="log" aria-live="polite"></div>
+
+    <form id="form">
+      <textarea id="input" rows="2" placeholder="Pose une autre question…"></textarea>
+      <div class="chat-row">
+        <button type="button" id="voice">Voix</button>
+        <button class="primary" type="submit">Envoyer</button>
+      </div>
+    </form>
+  </section>
+</main>
+<script src="alertchat.js"></script>
+<script src="chat.js"></script>
+</body>
+</html>
