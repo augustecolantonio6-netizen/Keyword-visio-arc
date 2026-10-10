@@ -15,8 +15,10 @@ chrome.runtime.onMessage.addListener((message,sender,sendResponse)=>{
   if(message?.type==="OPEN_CHAT"){
     chrome.storage.local.get({lastEvent:null}).then(({lastEvent})=>
       openAlertChatWindow(lastEvent||null)
-    ).then(result=>sendResponse({ok:true,windowId:result?.id??null}))
-      .catch(error=>sendResponse({ok:false,error:error.message}));
+    ).then(async result=>{
+      const focused=await focusWindowWithRetries(result.id);
+      sendResponse({ok:true,windowId:result?.id??null,focused});
+    }).catch(error=>sendResponse({ok:false,error:error.message}));
     return true;
   }
 
@@ -163,8 +165,7 @@ async function openAlertChatWindow(event){
       chrome.runtime.sendMessage({type:"CHAT_EVENT",payload:event}).catch(()=>{});
     }
 
-    const focused=await focusWindowWithRetries(created.id);
-    return {id:created.id,focused,existing:!!existing};
+    return {id:created.id,existing:!!existing};
   })();
   try{return await openingAlertChat;}
   finally{openingAlertChat=null;}
@@ -182,12 +183,15 @@ async function handleKeyword(payload){
   // Open the alert/chat surface first, so the capture window can close without losing the event.
   const alertWindow=await openAlertChatWindow(event);
 
+  // Close the transcription window before requesting focus on the alert/chat window.
   if(Number.isInteger(captureWindowId) && captureWindowId!==alertWindow.id){
     try{
       await chrome.windows.remove(captureWindowId);
     }catch{}
   }
 
+  // Focusing after removing the old window avoids competing popup focus requests.
+  const focused=await focusWindowWithRetries(alertWindow.id);
   const notificationId="keyword-alert-"+Date.now();
   try{
     await chrome.notifications.create(notificationId,{
@@ -206,7 +210,7 @@ async function handleKeyword(payload){
     captureStatus:"Mot-clé détecté : fenêtre de transcription fermée, alerte + chat ouverts."
   });
 
-  return {windowId:alertWindow.id,focused:alertWindow.focused};
+  return {windowId:alertWindow.id,focused};
 }
 
 chrome.notifications.onClicked.addListener(async notificationId=>{
