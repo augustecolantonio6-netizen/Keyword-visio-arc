@@ -1,14 +1,26 @@
-const ALERT_URL=chrome.runtime.getURL("alert.html");
-const CHAT_URL=chrome.runtime.getURL("chat.html");
 const CAPTURE_URL=chrome.runtime.getURL("capture.html");
 
-let openingChat=null;
 let openingCapture=null;
 
-chrome.runtime.onMessage.addListener((message)=>{
-  if(message?.type==="OPEN_CHAT") openChat(message.payload||{});
-  if(message?.type==="OPEN_CAPTURE_CONTROLLER") openCaptureController();
-  if(message?.type==="STOP_CAPTURE") chrome.runtime.sendMessage({type:"CAPTURE_STOP"}).catch(()=>{});
+chrome.runtime.onMessage.addListener((message,sender,sendResponse)=>{
+  if(message?.type==="OPEN_CAPTURE_CONTROLLER"){
+    openCaptureController()
+      .then(result=>sendResponse({ok:true,windowId:result?.id??null}))
+      .catch(error=>sendResponse({ok:false,error:error.message}));
+    return true;
+  }
+
+  if(message?.type==="OPEN_CHAT"){
+    openCaptureController()
+      .then(()=>chrome.runtime.sendMessage({type:"FOCUS_CHAT"}).catch(()=>{}))
+      .then(()=>sendResponse({ok:true}))
+      .catch(error=>sendResponse({ok:false,error:error.message}));
+    return true;
+  }
+
+  if(message?.type==="STOP_CAPTURE"){
+    chrome.runtime.sendMessage({type:"CAPTURE_STOP"}).catch(()=>{});
+  }
 
   if(message?.type==="CAPTURE_STATUS"){
     chrome.storage.local.set({
@@ -32,23 +44,30 @@ chrome.runtime.onMessage.addListener((message)=>{
   }
 });
 
+async function findCaptureWindow(){
+  const wins=await chrome.windows.getAll({populate:true});
+  return wins.find(w=>w.tabs?.some(t=>t.url?.startsWith(CAPTURE_URL)))||null;
+}
+
 async function openCaptureController(){
   if(openingCapture) return openingCapture;
 
   openingCapture=(async()=>{
-    const wins=await chrome.windows.getAll({populate:true});
-    const found=wins.find(w=>w.tabs?.some(t=>t.url?.startsWith(CAPTURE_URL)));
-
+    const found=await findCaptureWindow();
     if(found){
-      await chrome.windows.update(found.id,{focused:true,state:"normal"});
-      return;
+      return chrome.windows.update(found.id,{
+        focused:true,
+        state:"normal",
+        width:820,
+        height:900
+      });
     }
 
-    await chrome.windows.create({
+    return chrome.windows.create({
       url:CAPTURE_URL,
       type:"popup",
-      width:470,
-      height:360,
+      width:820,
+      height:900,
       focused:true
     });
   })();
@@ -57,59 +76,35 @@ async function openCaptureController(){
   finally{openingCapture=null;}
 }
 
-async function openChat(payload={}){
-  const event={...payload,ts:Date.now()};
-  await chrome.storage.local.set({chatBootstrap:event});
-
-  if(openingChat) return openingChat;
-  openingChat=(async()=>{
-    const wins=await chrome.windows.getAll({populate:true});
-    const found=wins.find(w=>w.tabs?.some(t=>t.url?.startsWith(CHAT_URL)));
-
-    if(!found){
-      await chrome.windows.create({
-        url:CHAT_URL,
-        type:"popup",
-        width:500,
-        height:780,
-        focused:false
-      });
+async function raiseCaptureController(){
+  try{
+    const found=await findCaptureWindow();
+    if(found){
+      await chrome.windows.update(found.id,{state:"normal",focused:true,drawAttention:true});
+      return true;
     }
-  })();
-
-  try{return await openingChat;}
-  finally{openingChat=null;}
+  }catch{}
+  return false;
 }
 
 async function handleKeyword(payload){
   const event={...payload,ts:Date.now()};
   await chrome.storage.local.set({lastEvent:event});
 
+  await raiseCaptureController();
+
   try{
-    await chrome.notifications.create(`keyword-${Date.now()}`,{
+    await chrome.notifications.create("keyword-"+Date.now(),{
       type:"basic",
       iconUrl:chrome.runtime.getURL("icons/icon128.png"),
-      title:`Mot détecté : ${payload.keyword||"mot-clé"}`,
+      title:"Mot détecté : "+(payload.keyword||"mot-clé"),
       message:payload.question||"Mot-clé détecté.",
       priority:2,
       requireInteraction:true
     });
   }catch{}
 
-  try{
-    const url=ALERT_URL+
-      `?keyword=${encodeURIComponent(payload.keyword||"")}`+
-      `&question=${encodeURIComponent(payload.question||"")}`;
-
-    await chrome.windows.create({
-      url,
-      type:"popup",
-      width:610,
-      height:330,
-      focused:true
-    });
-  }catch{}
-
-  await openChat(event);
+  // All surfaces are now inside the single capture/dashboard window.
+  chrome.runtime.sendMessage({type:"VISIO_ALERT",payload:event}).catch(()=>{});
   chrome.runtime.sendMessage({type:"CHAT_EVENT",payload:event}).catch(()=>{});
 }
