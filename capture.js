@@ -153,9 +153,8 @@ function scheduleSessionRefresh(){
 }
 
 function getResumeConfig(){
-  return sessionHandle
-    ? {sessionResumption:{handle:sessionHandle}}
-    : {sessionResumption:{}};
+  // The minimal transcription session does not need a resume token.
+  return {};
 }
 
 function connectLive(){
@@ -186,8 +185,6 @@ function connectLive(){
       setup:{
         model:"models/gemini-3.5-transcribe-live",
         generationConfig:{responseModalities:["TEXT"]},
-        contextWindowCompression:{slidingWindow:{}},
-        ...getResumeConfig(),
         inputAudioTranscription:{
           languageCodes,
           mode:"VERBATIM",
@@ -219,11 +216,25 @@ function connectLive(){
     );
   };
 
-  ws.onmessage=event=>{
+  ws.onmessage=async event=>{
     if(!running || generation!==reconnectGeneration) return;
 
+    let raw=event.data;
+    try{
+      if(typeof raw!=="string"){
+        if(raw instanceof Blob) raw=await raw.text();
+        else if(raw instanceof ArrayBuffer) raw=new TextDecoder().decode(raw);
+      }
+    }catch(e){
+      sendStatus("Impossible de lire la réponse Gemini Live : "+e.message);
+      return;
+    }
+
     let data;
-    try{data=JSON.parse(event.data)}catch{return}
+    try{data=JSON.parse(raw)}catch(e){
+      sendStatus("Réponse Gemini Live illisible (format inattendu).");
+      return;
+    }
 
     if(data.error){
       fatalWsError=true;
@@ -312,10 +323,13 @@ function connectLive(){
     setupTimeoutTimer=null;
     wsReady=false;
     if(running && generation===reconnectGeneration){
-      if(fatalWsError) return;
+      const detail=event?.code ? " (code "+event.code+(event.reason?", "+event.reason:"")+")" : "";
+      if(fatalWsError){
+        sendStatus("Gemini Live a fermé la connexion avant setupComplete"+detail+". Vérifie la clé API et l’accès au modèle.");
+        return;
+      }
       clearTimeout(liveReconnectTimer);
       liveReconnectTimer=setTimeout(()=>connectLive(),1200);
-      const detail=event?.code ? " (code "+event.code+(event.reason?", "+event.reason:"")+")" : "";
       sendStatus("Session Live fermée"+detail+". Nouvelle tentative…");
     }
   };
