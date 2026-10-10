@@ -10,6 +10,7 @@ let sessionHandle=null;
 let reconnectGeneration=0;
 let fatalWsError=false;
 let setupTimeoutTimer=null;
+let lastAudioMeterUpdate=0;
 let liveReconnectTimer=null;
 let sessionRefreshTimer=null;
 let running=false;
@@ -480,30 +481,53 @@ async function startCapture(){
 
     const audioTracks=stream.getAudioTracks();
     if(!audioTracks.length){
-      sendStatus("Vidéo capturée mais aucun audio système n'a été partagé. Relance la sélection en activant « partager l'audio ».");
-    }else{
-      audioContext=new AudioContext();
-      await audioContext.resume();
-
-      sourceNode=audioContext.createMediaStreamSource(new MediaStream(audioTracks));
-      processorNode=audioContext.createScriptProcessor(2048,1,1);
-
-      gainNode=audioContext.createGain();
-      gainNode.gain.value=0;
-
-      processorNode.onaudioprocess=e=>{
-        if(!running) return;
-        const input=e.inputBuffer.getChannelData(0);
-        enqueuePCM(downsampleTo16k(input,audioContext.sampleRate));
-      };
-
-      sourceNode.connect(processorNode);
-      processorNode.connect(gainNode);
-      gainNode.connect(audioContext.destination);
-
-      connectLive();
-      startRecording();
+      const msg="Aucune piste audio reçue. Les sous-titres ne peuvent pas démarrer. Relance la capture et active le partage audio si proposé; sinon essaie de partager l’onglet de la visio avec son audio.";
+      stream.getTracks().forEach(t=>t.stop());
+      stream=null;
+      videoTrack=null;
+      $("preview").srcObject=null;
+      running=false;
+      $("start").disabled=false;
+      $("stop").disabled=true;
+      $("minimize").disabled=true;
+      $("badge").textContent="OFF";
+      $("badge").style.background="#272727";
+      $("badge").style.color="#999";
+      $("state").textContent=msg;
+      sendStatus(msg,false);
+      return;
     }
+
+    audioContext=new AudioContext();
+    await audioContext.resume();
+
+    sourceNode=audioContext.createMediaStreamSource(new MediaStream(audioTracks));
+    processorNode=audioContext.createScriptProcessor(2048,1,1);
+
+    gainNode=audioContext.createGain();
+    gainNode.gain.value=0;
+
+    processorNode.onaudioprocess=e=>{
+      if(!running) return;
+      const input=e.inputBuffer.getChannelData(0);
+      let sumSquares=0;
+      for(let i=0;i<input.length;i++) sumSquares+=input[i]*input[i];
+      const rms=Math.sqrt(sumSquares/Math.max(1,input.length));
+      if(Date.now()-lastAudioMeterUpdate>250){
+        const meter=$("audioLevel");
+        if(meter) meter.textContent=String(Math.round(rms*100))+"%";
+        lastAudioMeterUpdate=Date.now();
+      }
+      enqueuePCM(downsampleTo16k(input,audioContext.sampleRate));
+    };
+
+    sourceNode.connect(processorNode);
+    processorNode.connect(gainNode);
+    gainNode.connect(audioContext.destination);
+
+    sendStatus("Audio reçu. Connexion à Gemini Live…");
+    connectLive();
+    startRecording();
 
     // Minimize the controller after the user has selected the source.
     setTimeout(async()=>{
@@ -518,7 +542,14 @@ async function startCapture(){
     });
 
   }catch(e){
-    sendStatus("Capture annulée/refusée : "+e.message,false);
+    const msg="Démarrage de la capture impossible : "+e.message;
+    if(running || stream || audioContext){
+      stopCapture(msg);
+    }else{
+      $("state").textContent=msg;
+      sendStatus(msg,false);
+    }
+    await revealControllerOnError();
   }
 }
 
