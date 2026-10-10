@@ -108,21 +108,52 @@ async function openCaptureController(){
 }
 
 async function raiseCaptureController(){
-  try{
-    const found=await findCaptureWindow();
-    if(found){
-      await chrome.windows.update(found.id,{state:"normal",focused:true,drawAttention:true});
-      return true;
+  const found=await findCaptureWindow();
+  if(!found) return {ok:false,error:"Fenêtre du tableau de bord introuvable."};
+
+  let lastError="";
+  for(let attempt=0;attempt<3;attempt++){
+    try{
+      await chrome.windows.update(found.id,{state:"normal"});
+      await chrome.windows.update(found.id,{focused:true,drawAttention:true});
+      await chrome.runtime.sendMessage({
+        type:"RAISE_DASHBOARD",
+        windowId:found.id,
+        attempt:attempt+1
+      }).catch(()=>{});
+
+      await new Promise(resolve=>setTimeout(resolve,180));
+      const check=await chrome.windows.get(found.id);
+      if(check.state!=="minimized" && check.focused){
+        return {ok:true,windowId:found.id};
+      }
+      lastError="Arc a restauré la fenêtre mais n’a pas confirmé son focus.";
+    }catch(e){
+      lastError=e?.message||String(e);
     }
-  }catch{}
-  return false;
+    await new Promise(resolve=>setTimeout(resolve,250));
+  }
+
+  chrome.runtime.sendMessage({
+    type:"DASHBOARD_FOCUS_FAILED",
+    message:lastError||"Impossible de mettre le tableau de bord au premier plan."
+  }).catch(()=>{});
+  return {ok:false,error:lastError};
 }
 
 async function handleKeyword(payload){
   const event={...payload,ts:Date.now()};
   await chrome.storage.local.set({lastEvent:event});
 
-  await raiseCaptureController();
+  const focusResult=await raiseCaptureController();
+  if(!focusResult.ok){
+    // Keep the visible notification as a fallback when Arc/Windows blocks focusing.
+    await chrome.runtime.sendMessage({
+      type:"CAPTURE_STATUS",
+      running:true,
+      status:"Alerte détectée, mais le focus de la fenêtre a échoué : "+focusResult.error
+    }).catch(()=>{});
+  }
 
   try{
     await chrome.notifications.create("keyword-"+Date.now(),{
