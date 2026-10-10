@@ -1,9 +1,6 @@
-const DEFAULT_PROMPT=`Je suis en terminale en cours de {{subject}} en visio.
-Voici la dernière question détectée :
-{{question}}
+const DEFAULT_PROMPT="Je suis en terminale en cours de {{subject}}.\nVoici la dernière question ou le passage transcrit :\n{{question}}\n\nAide-moi à comprendre ce qui est demandé. Explique brièvement les notions essentielles, puis propose une formulation orale courte que je pourrai reformuler avec mes propres mots. Reste naturel, clair et adapté au niveau terminale. Si la transcription est ambiguë, précise-le. Pas de smileys.";
 
-Explique brièvement la question et les notions utiles.
-Réponse compacte. Pas de smiley.`;
+const LEGACY_PROMPTS=["Je suis en terminale en cours de {{subject}} en visio.\nVoici la dernière question détectée :\n{{question}}\n\nExplique brièvement la question et les notions utiles.\nRéponse compacte. Pas de smiley.","Je suis en terminale en cours de {{subject}} en visio.\nJe n'ai pas écouté correctement le passage et le professeur vient de me poser cette question :\n{{question}}\n\nRéponds de façon humaine et brève pour m'aider à comprendre quoi répondre.\nPas de tirets. Pas de virgules. Pas de smiley.\nFais un petit texte compact."];
 
 const $=id=>document.getElementById(id);
 
@@ -17,6 +14,13 @@ async function load(){
     promptTemplate:DEFAULT_PROMPT,
     recordScreen:false
   });
+
+  const normalizePrompt=value=>(value||"").replace(/\s+/g," ").trim();
+  const savedPrompt=normalizePrompt(s.promptTemplate);
+  if(!savedPrompt||LEGACY_PROMPTS.some(old=>normalizePrompt(old)===savedPrompt)){
+    s.promptTemplate=DEFAULT_PROMPT;
+    await chrome.storage.local.set({promptTemplate:DEFAULT_PROMPT});
+  }
 
   $("keyword").value=s.keyword;
   $("subject").value=s.subject;
