@@ -3,16 +3,15 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Visio Keyword Alert</title>
+<title>Visio — transcription</title>
 <link rel="stylesheet" href="capture.css">
-<link rel="stylesheet" href="chat.css">
 </head>
 <body>
-<main id="dashboard">
-  <header class="topbar">
-    <div class="heading">
-      <h1>Visio Keyword Alert</h1>
-      <p id="state">Configure tes réglages puis choisis la fenêtre de visio.</p>
+<main>
+  <header>
+    <div>
+      <h1>Transcription visio</h1>
+      <p id="state">Clique sur « Choisir la fenêtre ».</p>
     </div>
     <span id="badge">OFF</span>
   </header>
@@ -26,7 +25,7 @@
   <details id="transcriptDetails">
     <summary>
       <span>Sous-titres en direct</span>
-      <span class="summary-meta">Audio <strong id="audioLevel">—</strong></span>
+      <span class="audio-meter">Audio <strong id="audioLevel">—</strong></span>
     </summary>
     <div id="transcriptContent">
       <div class="transcript-tools">
@@ -39,40 +38,7 @@
       <div id="status"></div>
     </div>
   </details>
-
-  <section id="alertBanner" class="alert-banner" hidden role="alert">
-    <div class="alert-kicker">MOT / PRÉNOM DÉTECTÉ</div>
-    <div id="alertKeyword"></div>
-    <div id="alertQuestion"></div>
-    <button id="dismissAlert" type="button">Masquer l’alerte</button>
-  </section>
-
-  <section id="chatPanel" hidden aria-label="Chat Gemini">
-    <header class="chat-head">
-      <div>
-        <strong>Chat Gemini</strong>
-        <span id="meta"></span>
-      </div>
-      <button id="clear" type="button">Effacer</button>
-    </header>
-
-    <details id="promptDetails">
-      <summary>Consignes du chat</summary>
-      <div id="promptPreview"></div>
-    </details>
-
-    <div id="messages" role="log" aria-live="polite"></div>
-
-    <form id="form">
-      <textarea id="input" rows="2" placeholder="Pose une autre question…"></textarea>
-      <div class="chat-row">
-        <button type="button" id="voice">Voix</button>
-        <button class="primary" type="submit">Envoyer</button>
-      </div>
-    </form>
-  </section>
 </main>
 <script src="capture.js"></script>
-<script src="chat.js"></script>
 </body>
 </html>
