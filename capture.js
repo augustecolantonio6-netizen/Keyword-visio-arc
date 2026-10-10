@@ -75,46 +75,6 @@ function showTranscript(){
   }).catch(()=>{});
 }
 
-function showAlert(payload){
-  const banner=$("alertBanner");
-  const chatPanel=$("chatPanel");
-  if(!banner || !chatPanel) return;
-  $("alertKeyword").textContent=payload?.keyword||"Mot détecté";
-  $("alertQuestion").textContent=payload?.question||"Le mot-clé a été détecté dans la transcription.";
-  banner.hidden=false;
-  chatPanel.hidden=false;
-  requestAnimationFrame(()=>banner.scrollIntoView({behavior:"smooth",block:"start"}));
-  focusDashboardWindow().catch(error=>{
-    const msg="Alerte affichée, mais remise au premier plan impossible : "+error.message;
-    $("state").textContent=msg;
-    const status=$("status");
-    if(status) status.textContent=msg;
-  });
-}
-
-async function focusDashboardWindow(){
-  const current=await chrome.windows.getCurrent();
-  const id=dashboardWindowId??current.id;
-  if(!Number.isInteger(id)) throw new Error("ID de fenêtre indisponible.");
-
-  let lastError="";
-  for(let attempt=0;attempt<4;attempt++){
-    try{
-      // Restore first, then activate with an explicit focus request.
-      await chrome.windows.update(id,{state:"normal"});
-      await chrome.windows.update(id,{focused:true,drawAttention:true});
-      try{window.focus()}catch{}
-      await new Promise(resolve=>setTimeout(resolve,200+attempt*150));
-      const check=await chrome.windows.get(id);
-      if(check.state!=="minimized" && check.focused) return true;
-      lastError="La fenêtre a été restaurée, mais Arc/Windows n’a pas confirmé son focus.";
-    }catch(error){
-      lastError=error?.message||String(error);
-    }
-  }
-  throw new Error(lastError||"Le système n’a pas activé la fenêtre.");
-}
-
 $("transcriptFullscreen").onclick=async()=>{
   const panel=$("transcriptDetails");
   panel.open=true;
@@ -605,14 +565,6 @@ async function startCapture(){
     connectLive();
     startRecording();
 
-    // Minimize the controller after the user has selected the source.
-    setTimeout(async()=>{
-      try{
-        const w=await chrome.windows.getCurrent();
-        if(w.id!=null) await chrome.windows.update(w.id,{state:"minimized"});
-      }catch{}
-    },250);
-
     stream.getTracks().forEach(track=>{
       track.addEventListener("ended",()=>stopCapture("La capture a été arrêtée par Windows ou par l'utilisateur."));
     });
@@ -694,29 +646,18 @@ $("minimize").onclick=async()=>{
 
 chrome.runtime.onMessage.addListener(msg=>{
   if(msg?.type==="CAPTURE_STOP") stopCapture();
-  if(msg?.type==="VISIO_ALERT") showAlert(msg.payload||{});
-  if(msg?.type==="CAPTURE_STATUS"){
-    const status=$("status");
-    if(status && msg.status) status.textContent=msg.status;
-    if(msg.status && /focus|premier plan|au premier plan/i.test(msg.status)){
-      $("state").textContent=msg.status;
-    }
-  }
-  if(msg?.type==="DASHBOARD_FOCUS_FAILED"){
-    const status=$("status");
-    const message="Alerte détectée, mais Arc/Windows a bloqué le premier plan : "+(msg.message||"");
-    if(status) status.textContent=message;
-    $("state").textContent=message;
-  }
-  if(msg?.type==="RAISE_DASHBOARD"){
-    focusDashboardWindow().catch(error=>{
-      const status=$("status");
-      if(status) status.textContent="Focus automatique refusé : "+error.message;
-    });
-  }
 });
 
-$("dismissAlert").onclick=()=>{$("alertBanner").hidden=true;};
+$("transcriptFullscreen").onclick=async()=>{
+  const panel=$("transcriptDetails");
+  panel.open=true;
+  try{
+    if(!document.fullscreenElement) await panel.requestFullscreen();
+    else await document.exitFullscreen();
+  }catch(error){
+    sendStatus("Plein écran indisponible : "+(error?.message||error));
+  }
+};
 
 chrome.windows.getCurrent().then(w=>{
   if(Number.isInteger(w.id)){
