@@ -6,23 +6,26 @@ let keyword = "";
 let history = [];
 let lastEventTs = 0;
 
-const DEFAULT_PROMPT = `Je suis en terminale en cours de {{subject}} en visio.
-Je n'ai pas écouté correctement le passage et le professeur vient de me poser cette question :
-{{question}}
+const DEFAULT_PROMPT="Je suis en terminale en cours de {{subject}}.\nVoici la dernière question ou le passage transcrit :\n{{question}}\n\nAide-moi à comprendre ce qui est demandé. Explique brièvement les notions essentielles, puis propose une formulation orale courte que je pourrai reformuler avec mes propres mots. Reste naturel, clair et adapté au niveau terminale. Si la transcription est ambiguë, précise-le. Pas de smileys.";
 
-Réponds de façon humaine et brève pour m'aider à comprendre quoi répondre.
-Pas de tirets. Pas de virgules. Pas de smiley.
-Fais un petit texte compact.`;
+const LEGACY_PROMPTS=["Je suis en terminale en cours de {{subject}} en visio.\nVoici la dernière question détectée :\n{{question}}\n\nExplique brièvement la question et les notions utiles.\nRéponse compacte. Pas de smiley.","Je suis en terminale en cours de {{subject}} en visio.\nJe n'ai pas écouté correctement le passage et le professeur vient de me poser cette question :\n{{question}}\n\nRéponds de façon humaine et brève pour m'aider à comprendre quoi répondre.\nPas de tirets. Pas de virgules. Pas de smiley.\nFais un petit texte compact."];
 
 const $ = id => document.getElementById(id);
 
 async function settings() {
-  return chrome.storage.local.get({
+  const s=await chrome.storage.local.get({
     subject:"Spécialité mathématiques",
     apiKey:"",
     model:"gemini-3.5-flash-lite",
     promptTemplate:DEFAULT_PROMPT
   });
+  const normalizePrompt=value=>(value||"").replace(/\s+/g," ").trim();
+  const savedPrompt=normalizePrompt(s.promptTemplate);
+  if(!savedPrompt||LEGACY_PROMPTS.some(old=>normalizePrompt(old)===savedPrompt)){
+    s.promptTemplate=DEFAULT_PROMPT;
+    await chrome.storage.local.set({promptTemplate:DEFAULT_PROMPT});
+  }
+  return s;
 }
 
 function renderPrompt() {
