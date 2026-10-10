@@ -107,31 +107,37 @@ async function openCaptureController(){
   finally{openingCapture=null;}
 }
 
-async function raiseCaptureController(){
-  const found=await findCaptureWindow();
-  if(!found) return {ok:false,error:"Fenêtre du tableau de bord introuvable."};
+async function raiseCaptureController(windowIdHint=null){
+  let target=null;
+  if(Number.isInteger(windowIdHint)){
+    try{target=await chrome.windows.get(windowIdHint)}catch{}
+  }
+  if(!target) target=await findCaptureWindow();
+  if(!target || !Number.isInteger(target.id)){
+    return {ok:false,error:"Fenêtre du tableau de bord introuvable."};
+  }
 
   let lastError="";
-  for(let attempt=0;attempt<3;attempt++){
+  for(let attempt=0;attempt<5;attempt++){
     try{
-      await chrome.windows.update(found.id,{state:"normal"});
-      await chrome.windows.update(found.id,{focused:true,drawAttention:true});
+      await chrome.windows.update(target.id,{state:"normal"});
+      await chrome.windows.update(target.id,{focused:true,drawAttention:true});
       await chrome.runtime.sendMessage({
         type:"RAISE_DASHBOARD",
-        windowId:found.id,
+        windowId:target.id,
         attempt:attempt+1
       }).catch(()=>{});
 
-      await new Promise(resolve=>setTimeout(resolve,180));
-      const check=await chrome.windows.get(found.id);
+      await new Promise(resolve=>setTimeout(resolve,250+attempt*100));
+      const check=await chrome.windows.get(target.id);
       if(check.state!=="minimized" && check.focused){
-        return {ok:true,windowId:found.id};
+        await chrome.storage.local.set({captureWindowId:target.id});
+        return {ok:true,windowId:target.id};
       }
-      lastError="Arc a restauré la fenêtre mais n’a pas confirmé son focus.";
+      lastError="Arc/Windows n’a pas confirmé que la fenêtre était active.";
     }catch(e){
       lastError=e?.message||String(e);
     }
-    await new Promise(resolve=>setTimeout(resolve,250));
   }
 
   chrome.runtime.sendMessage({
@@ -143,9 +149,13 @@ async function raiseCaptureController(){
 
 async function handleKeyword(payload){
   const event={...payload,ts:Date.now()};
-  await chrome.storage.local.set({lastEvent:event});
+  const targetWindowId=Number.isInteger(payload.dashboardWindowId)?payload.dashboardWindowId:null;
+  await chrome.storage.local.set({
+    lastEvent:event,
+    alertDashboardWindowId:targetWindowId
+  });
 
-  const focusResult=await raiseCaptureController();
+  const focusResult=await raiseCaptureController(targetWindowId);
   if(!focusResult.ok){
     // Keep the visible notification as a fallback when Arc/Windows blocks focusing.
     await chrome.runtime.sendMessage({
@@ -155,8 +165,9 @@ async function handleKeyword(payload){
     }).catch(()=>{});
   }
 
+  const notificationId="keyword-alert-"+Date.now();
   try{
-    await chrome.notifications.create("keyword-"+Date.now(),{
+    await chrome.notifications.create(notificationId,{
       type:"basic",
       iconUrl:chrome.runtime.getURL("icons/icon128.png"),
       title:"Mot détecté : "+(payload.keyword||"mot-clé"),
@@ -164,8 +175,22 @@ async function handleKeyword(payload){
       priority:2,
       requireInteraction:true
     });
+    await chrome.storage.local.set({alertNotificationId:notificationId});
   }catch{}
 
   chrome.runtime.sendMessage({type:"VISIO_ALERT",payload:event}).catch(()=>{});
   chrome.runtime.sendMessage({type:"CHAT_EVENT",payload:event}).catch(()=>{});
 }
+
+chrome.notifications.onClicked.addListener(async notificationId=>{
+  const stored=await chrome.storage.local.get({
+    alertNotificationId:null,
+    alertDashboardWindowId:null,
+    lastEvent:null
+  });
+  if(notificationId!==stored.alertNotificationId) return;
+  await raiseCaptureController(stored.alertDashboardWindowId);
+  if(stored.lastEvent){
+    chrome.runtime.sendMessage({type:"VISIO_ALERT",payload:stored.lastEvent}).catch(()=>{});
+  }
+});
