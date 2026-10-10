@@ -2,15 +2,21 @@
 
 ## Fonctionnement
 
-L'extension ouvre un tableau de bord unique depuis l'icône. Tu choisis explicitement la fenêtre ou l'onglet de visioconférence dans le sélecteur système et autorises le partage audio. Le tableau de bord affiche les sous-titres en direct, l'alerte et le chat Gemini sur la même page.
+L'extension ouvre un seul tableau de bord. En haut, les actions permettent de choisir la source de visioconférence et d'arrêter la surveillance. La transcription est dans un panneau repliable; un bouton permet de la développer en plein écran. Avant une alerte, le reste de la page reste vide.
 
-L'audio capturé est converti en PCM mono 16 kHz et envoyé à Gemini Live Transcription par WebSocket. La connexion attend `setupComplete` avant l'envoi des paquets audio. Les transcriptions provisoires et définitives sont affichées.
+Quand le mot-clé est détecté, un bandeau rouge s'affiche et le chat Gemini apparaît juste en dessous, dans le même document et sans iframe séparée. Les messages ont leur propre zone de défilement.
+
+L'audio capturé est converti en PCM mono 16 kHz et envoyé à Gemini Live Transcription par WebSocket. La connexion attend `setupComplete` avant l'envoi des paquets audio.
+
+## Alertes et mise au premier plan
+
+À la détection, la page envoie l'ID exact de sa fenêtre au service worker. Celui-ci tente de restaurer et de focaliser cette fenêtre plusieurs fois; la page effectue aussi ses propres tentatives. Une notification Windows avec interaction requise sert de secours et permet de ramener le tableau de bord au premier plan par clic.
+
+L'API Chromium propose `windows.update({focused:true})`, mais une extension ne peut pas imposer un mode natif `always-on-top` au-dessus de toutes les applications. Si Windows/Arc empêche le changement de focus malgré les tentatives, une petite application compagnon Windows serait nécessaire pour tenter une gestion native de la fenêtre.
 
 ## Détection et chat
 
-Le mot/prénom configuré est ajouté au vocabulaire de transcription. La détection vérifie les segments provisoires et définitifs avec un délai anti-répétition. Lorsqu'il est détecté, le tableau de bord revient au premier plan, affiche un bandeau d'alerte, capture une image et déclenche automatiquement une demande d'explication dans le chat pour aider à comprendre la question et les notions utiles. Le chat permet ensuite de poser d'autres questions par écrit ou à la voix.
-
-Le retour automatique vise l'explication des notions et de la démarche de réflexion, pas une réponse à réciter.
+Le mot/prénom configuré est ajouté au vocabulaire de transcription. La détection vérifie les segments provisoires et définitifs avec un délai anti-répétition. Une alerte déclenche automatiquement une demande d'explication des notions et de la démarche de réflexion; le chat reste ensuite disponible pour les questions supplémentaires par écrit ou à la voix.
 
 ## Configuration
 
@@ -24,17 +30,13 @@ Une option permet d'enregistrer le flux capturé en WebM. Le fichier est prépar
 
 1. Ouvre `arc://extensions`.
 2. Active le mode développeur.
-3. Charge le dossier de l'extension, ou clique sur « Recharger » si elle est déjà installée.
-4. Épingle l'icône.
-5. Configure la clé API et le mot/prénom.
-6. Clique sur « Lancer l'extension sur la visio ».
-7. Dans le tableau de bord, clique sur « Choisir la fenêtre » et sélectionne la visio avec son audio.
-8. Le tableau de bord se réduit pendant la surveillance et revient au premier plan lorsqu'un mot-clé est détecté.
+3. Charge le dossier contenant `manifest.json`, ou clique sur « Recharger » si l'extension est déjà installée.
+4. Configure la clé API et le mot/prénom.
+5. Clique sur « Lancer l'extension sur la visio », puis « Choisir la fenêtre » dans le tableau de bord.
+6. Sélectionne la source de la visio et son audio.
 
-## Interface et alertes
-
-Le tableau de bord permet maintenant le défilement vertical de toute la page et le chat dispose de son propre défilement des messages. Lors d'une alerte, l'extension tente plusieurs fois de restaurer et focaliser sa fenêtre, puis fait défiler la page vers le bandeau. Les notifications Windows restent un recours si Arc ou Windows bloque le focus automatique.
+Important : si tu utilises une copie locale décompressée, télécharger ou modifier les fichiers sur GitHub ne met pas automatiquement cette copie à jour. Il faut copier les nouveaux fichiers dans le dossier local puis recharger l'extension.
 
 ## Limites
 
-Le partage audio dépend des options proposées par Windows/Arc dans le sélecteur. Le tableau de bord est restauré et focalisé lors d'une alerte, mais l'API standard des fenêtres d'extension ne permet pas de garantir qu'il reste toujours au-dessus de toutes les applications, notamment en plein écran.
+Le partage audio dépend des options proposées par Windows/Arc dans le sélecteur système. Le focus et l'affichage en premier plan ont été renforcés, mais le comportement réel dépend de la version d'Arc et des politiques de fenêtres de Windows.
