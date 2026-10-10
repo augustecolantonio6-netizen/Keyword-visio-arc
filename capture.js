@@ -64,8 +64,22 @@ async function settings(){
 }
 
 function showTranscript(){
-  $("finalTranscript").textContent=transcriptFinal.slice(-12).join("\n");
+  const finalText=transcriptFinal.slice(-12).join("\n");
+  $("finalTranscript").textContent=finalText;
   $("interimTranscript").textContent=interimText;
+  chrome.runtime.sendMessage({
+    type:"LIVE_TRANSCRIPT",
+    transcript:finalText,
+    interim:interimText
+  }).catch(()=>{});
+}
+
+function showAlert(payload){
+  const banner=$("alertBanner");
+  if(!banner) return;
+  $("alertKeyword").textContent=payload?.keyword||"Mot détecté";
+  $("alertQuestion").textContent=payload?.question||"Le mot-clé a été détecté dans la transcription.";
+  banner.hidden=false;
 }
 
 function b64FromInt16(int16){
@@ -632,7 +646,16 @@ $("minimize").onclick=async()=>{
 
 chrome.runtime.onMessage.addListener(msg=>{
   if(msg?.type==="CAPTURE_STOP") stopCapture();
+  if(msg?.type==="VISIO_ALERT") showAlert(msg.payload||{});
 });
+
+$("dismissAlert").onclick=()=>{$("alertBanner").hidden=true;};
+
+chrome.windows.getCurrent().then(w=>{
+  if(Number.isInteger(w.id)){
+    chrome.runtime.sendMessage({type:"CAPTURE_CONTROLLER_READY",windowId:w.id}).catch(()=>{});
+  }
+}).catch(()=>{});
 
 window.addEventListener("beforeunload",()=>{
   if(running) stopCapture("Le contrôleur a été fermé.");
