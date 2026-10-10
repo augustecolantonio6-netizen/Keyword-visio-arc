@@ -5,13 +5,14 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Visio Keyword Alert</title>
 <link rel="stylesheet" href="capture.css">
+<link rel="stylesheet" href="chat.css">
 </head>
 <body>
-<main>
+<main id="dashboard">
   <header class="topbar">
     <div class="heading">
-      <h1>Surveillance visio</h1>
-      <p id="state">Clique sur « Choisir la fenêtre ».</p>
+      <h1>Visio Keyword Alert</h1>
+      <p id="state">Configure tes réglages puis choisis la fenêtre de visio.</p>
     </div>
     <span id="badge">OFF</span>
   </header>
@@ -22,17 +23,22 @@
     <button id="minimize" disabled>Réduire</button>
   </div>
 
-  <video id="preview" autoplay muted playsinline></video>
-
-  <section id="transcriptPanel" class="panel">
-    <div class="section-head">
-      <div class="label">Sous-titres en direct</div>
-      <div class="audio-meter">Audio <strong id="audioLevel">—</strong></div>
+  <details id="transcriptDetails">
+    <summary>
+      <span>Sous-titres en direct</span>
+      <span class="summary-meta">Audio <strong id="audioLevel">—</strong></span>
+    </summary>
+    <div id="transcriptContent">
+      <div class="transcript-tools">
+        <span class="label">Transcription de la visio</span>
+        <button id="transcriptFullscreen" type="button">Plein écran</button>
+      </div>
+      <video id="preview" autoplay muted playsinline></video>
+      <div id="finalTranscript" aria-live="polite"></div>
+      <div id="interimTranscript"></div>
+      <div id="status"></div>
     </div>
-    <div id="finalTranscript" aria-live="polite"></div>
-    <div id="interimTranscript"></div>
-    <div id="status"></div>
-  </section>
+  </details>
 
   <section id="alertBanner" class="alert-banner" hidden role="alert">
     <div class="alert-kicker">MOT / PRÉNOM DÉTECTÉ</div>
@@ -41,11 +47,32 @@
     <button id="dismissAlert" type="button">Masquer l’alerte</button>
   </section>
 
-  <section id="chatPanel" class="panel chat-panel">
-    <div class="label">Chat Gemini — aide à la compréhension</div>
-    <iframe id="chatFrame" src="chat.html" title="Chat Gemini" allow="clipboard-read; clipboard-write"></iframe>
+  <section id="chatPanel" hidden aria-label="Chat Gemini">
+    <header class="chat-head">
+      <div>
+        <strong>Chat Gemini</strong>
+        <span id="meta"></span>
+      </div>
+      <button id="clear" type="button">Effacer</button>
+    </header>
+
+    <details id="promptDetails">
+      <summary>Consignes du chat</summary>
+      <div id="promptPreview"></div>
+    </details>
+
+    <main id="messages" aria-live="polite"></main>
+
+    <form id="form">
+      <textarea id="input" rows="2" placeholder="Pose une autre question…"></textarea>
+      <div class="chat-row">
+        <button type="button" id="voice">Voix</button>
+        <button class="primary" type="submit">Envoyer</button>
+      </div>
+    </form>
   </section>
 </main>
 <script src="capture.js"></script>
+<script src="chat.js"></script>
 </body>
 </html>
