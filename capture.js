@@ -695,9 +695,18 @@ $("minimize").onclick=async()=>{
 chrome.runtime.onMessage.addListener(msg=>{
   if(msg?.type==="CAPTURE_STOP") stopCapture();
   if(msg?.type==="VISIO_ALERT") showAlert(msg.payload||{});
+  if(msg?.type==="CAPTURE_STATUS"){
+    const status=$("status");
+    if(status && msg.status) status.textContent=msg.status;
+    if(msg.status && /focus|premier plan|au premier plan/i.test(msg.status)){
+      $("state").textContent=msg.status;
+    }
+  }
   if(msg?.type==="DASHBOARD_FOCUS_FAILED"){
     const status=$("status");
-    if(status) status.textContent="Alerte détectée, mais Arc/Windows a bloqué le premier plan : "+(msg.message||"");
+    const message="Alerte détectée, mais Arc/Windows a bloqué le premier plan : "+(msg.message||"");
+    if(status) status.textContent=message;
+    $("state").textContent=message;
   }
   if(msg?.type==="RAISE_DASHBOARD"){
     focusDashboardWindow().catch(error=>{
