@@ -51,17 +51,6 @@ async function save(){
 
 $("save").onclick=save;
 
-$("chat").onclick=async()=>{
-  await save();
-  try{
-    const result=await chrome.runtime.sendMessage({type:"OPEN_CHAT"});
-    if(!result?.ok) throw new Error(result?.error||"Impossible d’ouvrir le tableau.");
-    window.close();
-  }catch(e){
-    $("status").textContent="Ouverture impossible : "+e.message;
-  }
-};
-
 $("start").onclick=async()=>{
   await save();
   const s=await chrome.storage.local.get(["keyword","apiKey"]);
