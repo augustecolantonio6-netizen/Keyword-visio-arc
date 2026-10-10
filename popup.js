@@ -53,8 +53,13 @@ $("save").onclick=save;
 
 $("chat").onclick=async()=>{
   await save();
-  chrome.runtime.sendMessage({type:"OPEN_CHAT"});
-  window.close();
+  try{
+    const result=await chrome.runtime.sendMessage({type:"OPEN_CHAT"});
+    if(!result?.ok) throw new Error(result?.error||"Impossible d’ouvrir le tableau.");
+    window.close();
+  }catch(e){
+    $("status").textContent="Ouverture impossible : "+e.message;
+  }
 };
 
 $("start").onclick=async()=>{
@@ -65,9 +70,14 @@ $("start").onclick=async()=>{
     return;
   }
 
-  $("status").textContent="Ouverture du contrôleur…";
-  chrome.runtime.sendMessage({type:"OPEN_CAPTURE_CONTROLLER"});
-  window.close();
+  $("status").textContent="Ouverture du tableau…";
+  try{
+    const result=await chrome.runtime.sendMessage({type:"OPEN_CAPTURE_CONTROLLER"});
+    if(!result?.ok) throw new Error(result?.error||"Impossible d’ouvrir le tableau.");
+    window.close();
+  }catch(e){
+    $("status").textContent="Ouverture impossible : "+e.message;
+  }
 };
 
 $("stop").onclick=()=>{
