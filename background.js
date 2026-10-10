@@ -18,6 +18,10 @@ chrome.runtime.onMessage.addListener((message,sender,sendResponse)=>{
     return true;
   }
 
+  if(message?.type==="CAPTURE_CONTROLLER_READY" && Number.isInteger(message.windowId)){
+    chrome.storage.local.set({captureWindowId:message.windowId}).catch(()=>{});
+  }
+
   if(message?.type==="STOP_CAPTURE"){
     chrome.runtime.sendMessage({type:"CAPTURE_STOP"}).catch(()=>{});
   }
@@ -44,9 +48,32 @@ chrome.runtime.onMessage.addListener((message,sender,sendResponse)=>{
   }
 });
 
+chrome.windows.onRemoved.addListener(async windowId=>{
+  const stored=await chrome.storage.local.get({captureWindowId:null});
+  if(stored.captureWindowId===windowId){
+    await chrome.storage.local.remove("captureWindowId");
+  }
+});
+
 async function findCaptureWindow(){
+  const stored=await chrome.storage.local.get({captureWindowId:null});
+  if(Number.isInteger(stored.captureWindowId)){
+    try{
+      const remembered=await chrome.windows.get(stored.captureWindowId,{populate:true});
+      const tabs=remembered.tabs||[];
+      const urlKnown=tabs.some(t=>typeof t.url==="string");
+      if(!urlKnown||tabs.some(t=>t.url.startsWith(CAPTURE_URL))){
+        return remembered;
+      }
+    }catch{
+      await chrome.storage.local.remove("captureWindowId");
+    }
+  }
+
   const wins=await chrome.windows.getAll({populate:true});
-  return wins.find(w=>w.tabs?.some(t=>t.url?.startsWith(CAPTURE_URL)))||null;
+  const found=wins.find(w=>w.tabs?.some(t=>t.url?.startsWith(CAPTURE_URL)))||null;
+  if(found) await chrome.storage.local.set({captureWindowId:found.id});
+  return found;
 }
 
 async function openCaptureController(){
@@ -63,13 +90,17 @@ async function openCaptureController(){
       });
     }
 
-    return chrome.windows.create({
+    const created=await chrome.windows.create({
       url:CAPTURE_URL,
       type:"popup",
       width:820,
       height:900,
       focused:true
     });
+    if(Number.isInteger(created.id)){
+      await chrome.storage.local.set({captureWindowId:created.id});
+    }
+    return created;
   })();
 
   try{return await openingCapture;}
@@ -104,7 +135,6 @@ async function handleKeyword(payload){
     });
   }catch{}
 
-  // All surfaces are now inside the single capture/dashboard window.
   chrome.runtime.sendMessage({type:"VISIO_ALERT",payload:event}).catch(()=>{});
   chrome.runtime.sendMessage({type:"CHAT_EVENT",payload:event}).catch(()=>{});
 }
