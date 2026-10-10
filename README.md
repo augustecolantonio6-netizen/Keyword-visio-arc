@@ -31,6 +31,10 @@ Une option permet d'enregistrer le flux capturé en WebM. Le fichier est prépar
 7. Dans le tableau de bord, clique sur « Choisir la fenêtre » et sélectionne la visio avec son audio.
 8. Le tableau de bord se réduit pendant la surveillance et revient au premier plan lorsqu'un mot-clé est détecté.
 
+## Interface et alertes
+
+Le tableau de bord permet maintenant le défilement vertical de toute la page et le chat dispose de son propre défilement des messages. Lors d'une alerte, l'extension tente plusieurs fois de restaurer et focaliser sa fenêtre, puis fait défiler la page vers le bandeau. Les notifications Windows restent un recours si Arc ou Windows bloque le focus automatique.
+
 ## Limites
 
 Le partage audio dépend des options proposées par Windows/Arc dans le sélecteur. Le tableau de bord est restauré et focalisé lors d'une alerte, mais l'API standard des fenêtres d'extension ne permet pas de garantir qu'il reste toujours au-dessus de toutes les applications, notamment en plein écran.
