@@ -1,3 +1,4 @@
+(function(){
 let subject = "Spécialité mathématiques";
 let promptTemplate = "";
 let question = "";
@@ -204,3 +205,5 @@ $("voice").onclick = () => {
 };
 
 init();
+
+})();
