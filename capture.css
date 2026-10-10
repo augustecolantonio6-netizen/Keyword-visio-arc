@@ -11,7 +11,7 @@ p{margin:5px 0 0;color:#aaa;font-size:11px;line-height:1.35}
 button{border:0;border-radius:8px;padding:8px 11px;background:#292929;color:#fff;font:inherit;font-size:12px;cursor:pointer}
 .primary{background:#f4f4f4;color:#111;font-weight:700}
 button:disabled{opacity:.45;cursor:default}
-#preview{display:none}
+#preview{position:absolute;width:1px;height:1px;left:-10000px;top:-10000px;opacity:0;pointer-events:none}
 #transcriptDetails{flex:none;border:1px solid #2b2b2b;border-radius:9px;background:#151515;overflow:hidden}
 #transcriptDetails>summary{list-style:none;cursor:pointer;display:flex;align-items:center;justify-content:space-between;gap:10px;padding:10px 12px;font-size:12px;font-weight:700}
 #transcriptDetails>summary::-webkit-details-marker{display:none}
