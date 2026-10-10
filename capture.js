@@ -6,6 +6,10 @@ let processorNode=null;
 let gainNode=null;
 let ws=null;
 let wsReady=false;
+let sessionHandle=null;
+let reconnectGeneration=0;
+let fatalWsError=false;
+let setupTimeoutTimer=null;
 let liveReconnectTimer=null;
 let sessionRefreshTimer=null;
 let running=false;
@@ -30,11 +34,20 @@ function normalize(s){
 }
 
 function sendStatus(status,ok=running){
+  const statusEl=$("status");
+  if(statusEl) statusEl.textContent=status;
   chrome.runtime.sendMessage({
     type:"CAPTURE_STATUS",
     running:ok,
     status
   }).catch(()=>{});
+}
+
+async function revealControllerOnError(){
+  try{
+    const w=await chrome.windows.getCurrent();
+    if(w.id!=null) await chrome.windows.update(w.id,{state:"normal",focused:true});
+  }catch{}
 }
 
 async function settings(){
@@ -96,16 +109,24 @@ function enqueuePCM(int16){
   while(pcmBuffer.length>=TARGET_PCS_SAMPLES){
     if(wsReady && ws && ws.readyState===WebSocket.OPEN){
       const chunk=new Int16Array(pcmBuffer.splice(0,TARGET_PCS_SAMPLES));
-      ws.send(JSON.stringify({
-        realtimeInput:{
-          audio:{
-            data:b64FromInt16(chunk),
-            mimeType:"audio/pcm;rate=16000"
+      try{
+        ws.send(JSON.stringify({
+          realtimeInput:{
+            audio:{
+              data:b64FromInt16(chunk),
+              mimeType:"audio/pcm;rate=16000"
+            }
           }
-        }
-      }));
+        }));
+      }catch(e){
+        for(let i=chunk.length-1;i>=0;i--) pcmBuffer.unshift(chunk[i]);
+        sendStatus("Envoi audio interrompu : "+e.message);
+        break;
+      }
     }else{
-      pcmBuffer.splice(0,TARGET_PCS_SAMPLES);
+      const maxBuffered=OUT_RATE*2;
+      if(pcmBuffer.length>maxBuffered) pcmBuffer.splice(0,pcmBuffer.length-maxBuffered);
+      break;
     }
   }
 }
@@ -138,7 +159,8 @@ function getResumeConfig(){
 
 function connectLive(){
   clearTimeout(liveReconnectTimer);
-  if(!running) return;
+  clearTimeout(setupTimeoutTimer);
+  if(!running || fatalWsError) return;
 
   const generation=++reconnectGeneration;
   wsReady=false;
@@ -173,7 +195,23 @@ function connectLive(){
       }
     };
 
-    ws.send(JSON.stringify(setup));
+    try{
+      ws.send(JSON.stringify(setup));
+    }catch(e){
+      fatalWsError=true;
+      sendStatus("Impossible d’envoyer la configuration à Gemini Live : "+e.message);
+      revealControllerOnError();
+      return;
+    }
+    clearTimeout(setupTimeoutTimer);
+    setupTimeoutTimer=setTimeout(()=>{
+      if(running && generation===reconnectGeneration && !wsReady){
+        fatalWsError=true;
+        sendStatus("Gemini Live ne répond pas à la configuration. Vérifie la clé API, le modèle et la connexion Internet.");
+        revealControllerOnError();
+        try{ws?.close()}catch{}
+      }
+    },15000);
     sendStatus(sessionHandle
       ? "Reconnexion Live avec reprise de session…"
       : "Connexion Live ouverte… attente de setupComplete."
@@ -186,7 +224,20 @@ function connectLive(){
     let data;
     try{data=JSON.parse(event.data)}catch{return}
 
+    if(data.error){
+      fatalWsError=true;
+      clearTimeout(setupTimeoutTimer);
+      wsReady=false;
+      const detail=data.error.message||data.error.status||JSON.stringify(data.error);
+      sendStatus("Erreur renvoyée par Gemini Live : "+detail);
+      revealControllerOnError();
+      try{ws?.close()}catch{}
+      return;
+    }
+
     if(data.setupComplete){
+      clearTimeout(setupTimeoutTimer);
+      setupTimeoutTimer=null;
       wsReady=true;
       scheduleSessionRefresh();
       sendStatus("Sous-titres Live actifs.");
@@ -251,16 +302,20 @@ function connectLive(){
   ws.onerror=()=>{
     wsReady=false;
     if(running && generation===reconnectGeneration){
-      sendStatus("Erreur Live. Tentative de reconnexion…");
+      sendStatus("Erreur réseau Live. Vérifie l’accès à generativelanguage.googleapis.com.");
     }
   };
 
-  ws.onclose=()=>{
+  ws.onclose=event=>{
+    clearTimeout(setupTimeoutTimer);
+    setupTimeoutTimer=null;
     wsReady=false;
     if(running && generation===reconnectGeneration){
+      if(fatalWsError) return;
       clearTimeout(liveReconnectTimer);
       liveReconnectTimer=setTimeout(()=>connectLive(),1200);
-      sendStatus("Session Live fermée. Reconnexion…");
+      const detail=event?.code ? " (code "+event.code+(event.reason?", "+event.reason:"")+")" : "";
+      sendStatus("Session Live fermée"+detail+". Nouvelle tentative…");
     }
   };
 }
@@ -469,8 +524,12 @@ async function startCapture(){
 
 function stopCapture(reason="Surveillance arrêtée."){
   running=false;
+  reconnectGeneration++;
+  fatalWsError=false;
+  clearTimeout(setupTimeoutTimer);
   clearTimeout(liveReconnectTimer);
   clearTimeout(sessionRefreshTimer);
+  setupTimeoutTimer=null;
   liveReconnectTimer=null;
   sessionRefreshTimer=null;
 
