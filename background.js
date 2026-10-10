@@ -49,7 +49,11 @@ chrome.runtime.onMessage.addListener((message,sender,sendResponse)=>{
   if(message?.type==="KEYWORD_DETECTED"){
     handleKeyword(message.payload||{})
       .then(result=>sendResponse({ok:true,...result}))
-      .catch(error=>sendResponse({ok:false,error:error?.message||String(error)}));
+      .catch(error=>{
+        const detail=error?.message||String(error);
+        chrome.runtime.sendMessage({type:"ALERT_OPEN_FAILED",error:detail}).catch(()=>{});
+        sendResponse({ok:false,error:detail});
+      });
     return true;
   }
 });
