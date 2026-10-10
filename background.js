@@ -122,12 +122,6 @@ async function raiseCaptureController(windowIdHint=null){
     try{
       await chrome.windows.update(target.id,{state:"normal"});
       await chrome.windows.update(target.id,{focused:true,drawAttention:true});
-      await chrome.runtime.sendMessage({
-        type:"RAISE_DASHBOARD",
-        windowId:target.id,
-        attempt:attempt+1
-      }).catch(()=>{});
-
       await new Promise(resolve=>setTimeout(resolve,250+attempt*100));
       const check=await chrome.windows.get(target.id);
       if(check.state!=="minimized" && check.focused){
