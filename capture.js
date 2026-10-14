@@ -75,6 +75,58 @@ function showTranscript(){
   }).catch(()=>{});
 }
 
+let transcriptSaveChain=Promise.resolve();
+
+function persistTranscript(){
+  const parts=transcriptFinal.slice();
+  const text=parts.join("\n");
+  transcriptSaveChain=transcriptSaveChain
+    .then(()=>chrome.storage.local.set({
+      sessionTranscriptParts:parts,
+      sessionTranscript:text,
+      sessionTranscriptUpdatedAt:Date.now()
+    }))
+    .catch(error=>sendStatus("Sauvegarde de transcription impossible : "+error.message));
+  return transcriptSaveChain;
+}
+
+async function restoreSavedTranscript(){
+  try{
+    const stored=await chrome.storage.local.get({sessionTranscriptParts:[]});
+    if(!running && transcriptFinal.length===0 && Array.isArray(stored.sessionTranscriptParts)){
+      transcriptFinal=stored.sessionTranscriptParts.filter(x=>typeof x==="string");
+      showTranscript();
+    }
+  }catch{}
+}
+
+async function downloadTranscript(){
+  await transcriptSaveChain;
+  let parts=transcriptFinal.slice();
+  if(!parts.length){
+    const stored=await chrome.storage.local.get({sessionTranscriptParts:[]});
+    if(Array.isArray(stored.sessionTranscriptParts)) parts=stored.sessionTranscriptParts;
+  }
+  const text=parts.filter(x=>typeof x==="string"&&x.trim()).join("\n").trim();
+  if(!text){
+    sendStatus("Aucun sous-titre à télécharger pour le moment.");
+    return;
+  }
+  const blob=new Blob(["\uFEFF",text+"\n"],{type:"text/plain;charset=utf-8"});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement("a");
+  a.href=url;
+  a.download="transcription-visio-"+new Date().toISOString().replace(/[:.]/g,"-")+".txt";
+  a.style.display="none";
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(()=>URL.revokeObjectURL(url),2000);
+  sendStatus("Téléchargement de la transcription complète lancé ("+parts.length+" segments).");
+}
+
+$("downloadTranscript").onclick=()=>downloadTranscript();
+
 $("transcriptFullscreen").onclick=async()=>{
   const panel=$("transcriptDetails");
   panel.open=true;
@@ -151,14 +203,21 @@ function enqueuePCM(int16){
 }
 
 function checkKeyword(text){
-  const s=awaitSettingsCache;
-  const word=normalize(s.keyword);
-  if(!word || !text) return false;
+  const word=normalize(awaitSettingsCache.keyword).replace(/\s+/g," ").trim();
+  const hay=normalize(text).replace(/\s+/g," ").trim();
+  if(word.length<2 || !hay) return false;
 
-  const hay=normalize(text).replace(/\s+/g," ");
-  const target=word.replace(/\s+/g," ");
-
-  return hay.includes(target);
+  // Match whole words/phrases and never search old transcript context.
+  const isWordChar=char=>!!char && /[a-z0-9]/.test(char);
+  let index=hay.indexOf(word);
+  while(index!==-1){
+    const before=index>0 ? hay[index-1] : "";
+    const afterIndex=index+word.length;
+    const after=afterIndex<hay.length ? hay[afterIndex] : "";
+    if(!isWordChar(before) && !isWordChar(after)) return true;
+    index=hay.indexOf(word,index+1);
+  }
+  return false;
 }
 
 let awaitSettingsCache={keyword:"",subject:"",apiKey:"",model:"",language:"",promptTemplate:"",recordScreen:false};
@@ -301,18 +360,14 @@ function connectLive(){
     if(c.interimInputTranscription){
       interimText=c.interimInputTranscription.text||"";
       showTranscript();
-
-      const combined=(currentSpeechForTrigger+" "+interimText).trim();
-      if(checkKeyword(combined)){
-        triggerKeyword(awaitSettingsCache).catch(e=>sendStatus("Détection : "+e.message));
-      }
+      // Wait for final transcription to reduce false alerts from unstable hypotheses.
     }
 
     if(c.inputTranscription){
       const final=c.inputTranscription.text||"";
       if(final){
         transcriptFinal.push(final);
-        if(transcriptFinal.length>40) transcriptFinal.shift();
+        persistTranscript();
 
         currentSpeechForTrigger=(currentSpeechForTrigger+" "+final)
           .trim()
@@ -321,7 +376,7 @@ function connectLive(){
         interimText="";
         showTranscript();
 
-        if(checkKeyword(final)||checkKeyword(currentSpeechForTrigger)){
+        if(checkKeyword(final)){
           triggerKeyword(awaitSettingsCache).catch(e=>sendStatus("Détection : "+e.message));
           currentSpeechForTrigger="";
         }
@@ -505,6 +560,11 @@ async function startCapture(){
     interimText="";
     currentSpeechForTrigger="";
     pcmBuffer=[];
+    await chrome.storage.local.set({
+      sessionTranscriptParts:[],
+      sessionTranscript:"",
+      sessionTranscriptUpdatedAt:Date.now()
+    });
     showTranscript();
 
     $("start").disabled=true;
@@ -663,6 +723,8 @@ $("transcriptFullscreen").onclick=async()=>{
     sendStatus("Plein écran indisponible : "+(error?.message||error));
   }
 };
+
+restoreSavedTranscript();
 
 chrome.windows.getCurrent().then(w=>{
   if(Number.isInteger(w.id)){
