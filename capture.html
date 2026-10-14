@@ -30,7 +30,10 @@
     <div id="transcriptContent">
       <div class="transcript-tools">
         <span class="label">Transcription de la visio</span>
-        <button id="transcriptFullscreen" type="button">Plein écran</button>
+        <div class="transcript-actions">
+          <button id="downloadTranscript" type="button">Télécharger .txt</button>
+          <button id="transcriptFullscreen" type="button">Plein écran</button>
+        </div>
       </div>
       <video id="preview" autoplay muted playsinline></video>
       <div id="finalTranscript" aria-live="polite"></div>
