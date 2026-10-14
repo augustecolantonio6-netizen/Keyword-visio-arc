@@ -15,6 +15,10 @@ chrome.runtime.onMessage.addListener(message=>{
   if(message?.type==="ALERT_EVENT") renderAlertEvent(message.payload);
 });
 
-document.getElementById("closeAlertWindow").addEventListener("click",()=>{
+function closeFalseAlert(){
+  // Close only the alert/chat window. The separate transcription window keeps running.
   window.close();
-});
+}
+
+document.getElementById("closeAlertWindow").addEventListener("click",closeFalseAlert);
+document.getElementById("falseAlertButton").addEventListener("click",closeFalseAlert);
