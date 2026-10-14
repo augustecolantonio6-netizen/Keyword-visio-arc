@@ -177,32 +177,21 @@ async function openAlertChatWindow(event){
 
 async function handleKeyword(payload){
   const event={...payload,ts:Date.now()};
-  const stored=await chrome.storage.local.get({captureWindowId:null});
-  const captureWindowId=Number.isInteger(payload.dashboardWindowId)
-    ? payload.dashboardWindowId
-    : stored.captureWindowId;
-
   await chrome.storage.local.set({lastEvent:event});
 
-  // Open the alert/chat surface first, so the capture window can close without losing the event.
+  // Open/focus the alert-chat window, but leave transcription and its audio stream running.
   const alertWindow=await openAlertChatWindow(event);
-
-  // Close the transcription window before requesting focus on the alert/chat window.
-  if(Number.isInteger(captureWindowId) && captureWindowId!==alertWindow.id){
-    try{
-      await chrome.windows.remove(captureWindowId);
-    }catch{}
-  }
-
-  // Focusing after removing the old window avoids competing popup focus requests.
   const focused=await focusWindowWithRetries(alertWindow.id);
+
   const notificationId="keyword-alert-"+Date.now();
   try{
     await chrome.notifications.create(notificationId,{
       type:"basic",
       iconUrl:chrome.runtime.getURL("icons/icon128.png"),
       title:"Mot détecté : "+(payload.keyword||"mot-clé"),
-      message:"La fenêtre d’alerte et de chat est ouverte.",
+      message:focused
+        ? "La fenêtre d’alerte et de chat est ouverte."
+        : "Clique ici pour afficher la fenêtre d’alerte et de chat.",
       priority:2,
       requireInteraction:true
     });
@@ -210,8 +199,10 @@ async function handleKeyword(payload){
   }catch{}
 
   await chrome.storage.local.set({
-    captureRunning:false,
-    captureStatus:"Mot-clé détecté : fenêtre de transcription fermée, alerte + chat ouverts."
+    captureRunning:true,
+    captureStatus:focused
+      ? "Mot-clé détecté : alerte + chat ouverts. La transcription continue."
+      : "Mot-clé détecté : la transcription continue. Clique sur la notification si la fenêtre d’alerte n’est pas au premier plan."
   });
 
   return {windowId:alertWindow.id,focused};
