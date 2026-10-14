@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "Visio Keyword Alert",
-  "version": "0.9.0",
-  "description": "Sous-titres Live d'une fenêtre de visioconférence, détection de mot-clé, alerte et chat d'assistance.",
+  "version": "0.9.1",
+  "description": "Transcription Live, détection stricte de mot-clé, alerte + chat et export complet.",
   "permissions": [
     "storage",
     "notifications",
